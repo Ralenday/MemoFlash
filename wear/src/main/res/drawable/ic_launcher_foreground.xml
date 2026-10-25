@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Dos tarjetas apiladas con un rayo -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#7FB8E6"
+        android:pathData="M40,34 L70,30 Q74,29.5 74.5,33.5 L78,64 Q78.5,68 74.5,68.5 L44,72 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M34,38 L64,38 Q68,38 68,42 L68,74 Q68,78 64,78 L34,78 Q30,78 30,74 L30,42 Q30,38 34,38 Z" />
+    <path
+        android:fillColor="#FFB000"
+        android:pathData="M52,44 L40,60 L48,60 L45,72 L58,55 L50,55 Z" />
+</vector>
