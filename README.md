@@ -78,15 +78,31 @@ la misma llave; es requisito de la Data Layer para que se reconozcan.
 
 ## Cómo correrla
 
+> 📖 **¿Quieres correr el proyecto en otro PC con los 2 emuladores o descargar los APKs listos?**
+> Consulta la [**Guía paso a paso para correr MemoFlash con 2 emuladores (EMULADORES.md)**](EMULADORES.md) o descarga los APKs directamente desde [**GitHub Releases**](https://github.com/Ralenday/MemoFlash/releases).
+
 1. Abre la carpeta `MemoFlash` en Android Studio (**File → Open**) y espera el Gradle Sync.
 2. Arriba, en el selector de configuración, elige **mobile** y córrela en el emulador de teléfono;
    luego elige **wear** y córrela en el emulador del reloj.
 
 Cada app funciona sola desde ese momento. El teléfono crea un mazo de ejemplo (“Inglés básico”).
 
-### Emparejar los emuladores para probar la sincronización
+### Sincronizar los 2 emuladores
 
-La Data Layer solo funciona entre un teléfono y un reloj **emparejados**:
+Tienes dos maneras de conectar el emulador de teléfono y el de reloj (detalladas en [**EMULADORES.md**](EMULADORES.md)):
+
+#### Opción rápida (puente local sin cuenta de Google)
+Cuando corre en emuladores sin nodos de Wear OS emparejados, `Sincronizador` habilita automáticamente un puente local por TCP (`19876` para el teléfono y `19877` para el reloj). Solo necesitas redirigir los puertos por `adb`:
+
+```bash
+adb -s <emulador-telefono> forward tcp:19876 tcp:19876
+adb -s <emulador-reloj> forward tcp:19877 tcp:19877
+```
+
+Al abrir MemoFlash en ambos (o tocar **Sincronizar**), el teléfono mostrará **“⌚ Reloj conectado: Reloj (emulador)”** y el reloj mostrará **“📱 Teléfono conectado”**.
+
+#### Opción con emparejamiento oficial de Wear OS (Data Layer)
+Si prefieres emparejar los emuladores mediante Google Play Services:
 
 1. En el emulador del teléfono (debe tener **Play Store**), abre Play Store, inicia sesión con una
    cuenta de Google e instala **Wear OS by Google** (o la app compañera de Pixel Watch).

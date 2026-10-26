@@ -99,7 +99,11 @@ class BaseDatos private constructor(context: Context) :
             .lista { leerMazo() }.firstOrNull()
 
     fun guardarMazo(mazo: Mazo) {
-        writableDatabase.insertWithOnConflict("mazos", null, mazo.valores(), SQLiteDatabase.CONFLICT_REPLACE)
+        val db = writableDatabase
+        // UPDATE en vez de REPLACE para no borrar en cascada las tarjetas del mazo
+        if (db.update("mazos", mazo.valores(), "uuid = ?", arrayOf(mazo.uuid)) == 0) {
+            db.insert("mazos", null, mazo.valores())
+        }
         notificar(local = true)
     }
 
@@ -254,7 +258,12 @@ class BaseDatos private constructor(context: Context) :
             val idsTarjetas = tarjetas.map { it.uuid }.toSet()
             ids("mazos").filterNot { it in idsMazos }.forEach { delete("mazos", "uuid = ?", arrayOf(it)) }
             ids("tarjetas").filterNot { it in idsTarjetas }.forEach { delete("tarjetas", "uuid = ?", arrayOf(it)) }
-            mazos.forEach { insertWithOnConflict("mazos", null, it.valores(), SQLiteDatabase.CONFLICT_REPLACE) }
+            for (mazo in mazos) {
+                // UPDATE en vez de REPLACE para no borrar en cascada las tarjetas ni su historial
+                if (update("mazos", mazo.valores(), "uuid = ?", arrayOf(mazo.uuid)) == 0) {
+                    insert("mazos", null, mazo.valores())
+                }
+            }
             for (tarjeta in tarjetas) {
                 // UPDATE en vez de REPLACE para no borrar en cascada el historial de la tarjeta
                 if (update("tarjetas", tarjeta.valores(), "uuid = ?", arrayOf(tarjeta.uuid)) == 0) {
