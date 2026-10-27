@@ -4,5 +4,6 @@ build/
 .idea/
 *.iml
 local.properties
+supabase.properties
 .DS_Store
 captures/

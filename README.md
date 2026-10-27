@@ -4,9 +4,9 @@ Asistente de estudio con flashcards y **repetición espaciada** para **Android (
 
 **Versión 1.1** · Kotlin · Jetpack Compose · SQLite · Wearable Data Layer
 
-- **Teléfono:** crea y edita mazos (texto e imágenes), importa listas (pegar desde Excel/Sheets o abrir .txt/.csv), sesiones de estudio largas y estadísticas de retención.
+- **Teléfono:** entras con correo y contraseña, creas y editas mazos (texto e imágenes), importas listas (pegar desde Excel/Sheets o abrir .txt/.csv), haces sesiones de estudio largas y ves estadísticas de retención. Los mazos, las tarjetas y los repasos se guardan en tu cuenta.
 - **Reloj:** repasa sesiones cortas de 10 tarjetas: ves la pregunta, tocas para ver la respuesta y eliges **Difícil / Regular / Fácil**. Funciona sin el teléfono.
-- **Juntos:** lo que estudias en un dispositivo actualiza las fechas de repaso en el otro.
+- **Juntos:** lo que estudias en un dispositivo actualiza las fechas de repaso en el otro. El teléfono es el que sube todo a la cuenta.
 
 ## Capturas
 
@@ -24,7 +24,8 @@ Material Design.
 
 | Pantalla | Qué tiene |
 |---|---|
-| **Mazos** | Resumen "Para hoy" con las tarjetas pendientes de todos los mazos, estado del reloj con botón de sincronizar y la lista de mazos con su conteo de pendientes. |
+| **Acceso** | Correo y contraseña para entrar o crear la cuenta. |
+| **Mazos** | Resumen "Para hoy", estado del reloj, la cuenta (correo y si ya se guardó en la nube) y la lista de mazos con su conteo de pendientes. |
 | **Detalle del mazo** | Pendientes y total, botón **Estudiar**, **Importar lista**, interruptor "Disponible en el reloj" y la lista de tarjetas con cuándo toca cada una. |
 | **Estudio** | Barra de progreso, tarjeta que **gira** para mostrar la respuesta y tres botones tonales (Difícil / Regular / Fácil) con el próximo intervalo. |
 | **Editor** | Frente y reverso, cada uno con texto e imagen opcional. |
@@ -47,6 +48,11 @@ Material Design.
 │  UI (Compose Material 3)         │          │  UI (Wear Compose Material 3)   │
 │        │                         │          │        │                        │
 │  BaseDatos (SQLite local)        │          │  BaseDatos (SQLite local)       │
+│        │            │            │          │        │                        │
+│        │            ▼            │          │        │                        │
+│        │     Cuenta (Supabase)   │          │        │                        │
+│        │     mazos, tarjetas,    │          │        │                        │
+│        │     repasos             │          │        │                        │
 │        │                         │          │        │                        │
 │  Sincronizador ──► DataItem      │ Bluetooth│  Sincronizador ──► DataItem     │
 │   /memoflash/telefono            │◄────────►│   /memoflash/reloj              │
@@ -54,10 +60,14 @@ Material Design.
 └──────────────────────────────────┘          └─────────────────────────────────┘
 ```
 
-Cada dispositivo tiene **su propia base SQLite** y funciona solo. Para enlazarlos se usa la
-**Wearable Data Layer API** de Google Play Services: no hace falta internet, servidor ni cuenta
-en la nube. Si los dispositivos están separados (por ejemplo, dejaste el teléfono en casa), los
-cambios se guardan y se entregan solos al reconectarse.
+Cada dispositivo tiene **su propia base SQLite** y se puede estudiar sin conexión. El teléfono y el
+reloj se enlazan con la **Wearable Data Layer API** de Google Play Services: no hace falta internet
+para ese enlace. Si los dispositivos están separados, los cambios se guardan y se entregan solos al
+reconectarse.
+
+La cuenta en la nube es aparte: el teléfono inicia sesión y sube o baja mazos, tarjetas y repasos.
+Si no hay internet, el estudio sigue en el teléfono y se guarda en la cuenta cuando vuelve la red.
+Las imágenes se quedan en el teléfono; en Supabase solo va el texto y el progreso.
 
 ### Cómo se evitan los conflictos
 
@@ -69,10 +79,18 @@ cambios se guardan y se entregan solos al reconectarse.
    historial siempre da el mismo `proximo_repaso`. Así, aunque estudies la misma tarjeta en el
    reloj y en el teléfono sin conexión, al unirse ambos llegan al mismo resultado.
 4. El reloj marca sus repasos como confirmados cuando el teléfono se los devuelve en su paquete.
+5. **La cuenta es el dueño de la copia en la nube.** Al entrar, el teléfono une lo local con lo de
+   Supabase: gana la versión más nueva de cada mazo o tarjeta, y un borrado posterior a esa versión
+   la elimina. El historial de repasos solo se suma. Cada fila lleva el usuario de la sesión y la
+   base solo deja leer o escribir las filas propias (Row Level Security).
 
-> ¿Y la nube (Firebase/Supabase)? No es necesaria para enlazar teléfono y reloj. Si después
-> quieres respaldo o usar varios teléfonos, se puede agregar sin cambiar este diseño: el teléfono
-> subiría el mismo historial a la nube.
+## Cuenta (Supabase)
+
+El proyecto se llama **MemoFlash**. El esquema está en [`supabase/schema.sql`](supabase/schema.sql)
+(tablas `mazos`, `tarjetas`, `historial_repasos` y `borrados`).
+
+Al crear la cuenta, el correo queda confirmado enseguida para poder entrar sin abrir un enlace.
+Cerrar sesión en el teléfono quita la copia local; los datos siguen en la cuenta.
 
 ## Base de datos (SQLite)
 
@@ -108,11 +126,14 @@ MemoFlash/
 │       │   ├── tema/           Colores, tipografía, formas e íconos
 │       │   ├── componentes/    Piezas de UI reutilizables (bloques, pastillas, diálogos)
 │       │   ├── datos/          Consultas, imágenes, importador, formato y cálculo de estadísticas
-│       │   └── pantallas/      Mazos, detalle, editor, importar, estudio y estadísticas
+│       │   ├── nube/           Sesión, subida y bajada de la cuenta
+│       │   └── pantallas/      Acceso, mazos, detalle, editor, importar, estudio y estadísticas
 │       ├── test/               Pruebas unitarias (importador, formato, estadísticas)
 │       └── androidTest/        Pruebas de interfaz en emulador
 ├── wear/                       App del reloj
 ├── screenshots/                Capturas usadas en este README
+├── supabase/schema.sql         Tablas y permisos de la cuenta
+├── supabase.properties.example URL y clave publicable para compilar el teléfono
 └── EMULADORES.md               Guía para correr los 2 emuladores
 ```
 
@@ -124,11 +145,18 @@ la misma llave; es requisito de la Data Layer para que se reconozcan.
 > **¿Quieres correr el proyecto en otro PC con los 2 emuladores o descargar los APKs listos?**
 > Consulta la [**Guía paso a paso para correr MemoFlash con 2 emuladores (EMULADORES.md)**](EMULADORES.md) o descarga los APKs directamente desde [**GitHub Releases**](https://github.com/Ralenday/MemoFlash/releases).
 
-1. Abre la carpeta `MemoFlash` en Android Studio (**File → Open**) y espera el Gradle Sync.
-2. Arriba, en el selector de configuración, elige **mobile** y córrela en el emulador de teléfono;
+1. Copia la configuración de la cuenta (no se sube a git):
+
+   ```bash
+   cp supabase.properties.example supabase.properties
+   ```
+
+2. Abre la carpeta `MemoFlash` en Android Studio (**File → Open**) y espera el Gradle Sync.
+3. Arriba, en el selector de configuración, elige **mobile** y córrela en el emulador de teléfono;
    luego elige **wear** y córrela en el emulador del reloj.
 
-Cada app funciona sola desde ese momento. El teléfono crea un mazo de ejemplo (“Inglés básico”).
+En el teléfono hay que entrar o crear una cuenta. La primera cuenta vacía recibe el mazo de
+ejemplo (“Inglés básico”). El reloj no pide cuenta: recibe los mazos del teléfono.
 
 ### Sincronizar los 2 emuladores
 
@@ -177,6 +205,7 @@ verás los repasos hechos en el reloj.
 | Prueba | Qué comprueba |
 |---|---|
 | `RepeticionEspaciadaTest` (core) | El algoritmo SM-2, incluido que el resultado no dependa del orden en que llegan los repasos de cada dispositivo. |
+| `FusionNubeTest` (core) | La unión de la copia local con la de la cuenta: gana lo más nuevo y un borrado posterior elimina el mazo. |
 | `ImportadorTest` | Separadores (tabulador, `;`, `-`, `=`, `,`), comillas de CSV, comentarios y líneas incompletas. |
 | `FormatoTest` | Textos de "cuándo toca" y plurales. |
 | `EstadisticasTest` | Racha, repasos de hoy, acierto, origen (teléfono/reloj), estados y pronóstico. |
@@ -185,4 +214,4 @@ verás los repasos hechos en el reloj.
 > Si Gradle dice que tu JDK no tiene `javac`, usa el que trae Android Studio:
 > `./gradlew -Dorg.gradle.java.home=<ruta de Android Studio>/jbr ...`
 
-Hecha con Kotlin, Jetpack Compose, SQLite y la Wearable Data Layer API.
+Hecha con Kotlin, Jetpack Compose, SQLite, Supabase y la Wearable Data Layer API.

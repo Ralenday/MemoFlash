@@ -77,12 +77,14 @@ class Sincronizador private constructor(private val context: Context) {
 
     /** Publica automáticamente cada vez que el usuario cambia algo en este dispositivo. */
     @OptIn(FlowPreview::class)
-    fun iniciar(scope: CoroutineScope) {
+    fun iniciar(scope: CoroutineScope, publicarAlArrancar: Boolean = true) {
         if (esEmulador) iniciarServidorLocal(scope)
         scope.launch(Dispatchers.IO) {
             db.cambiosLocales.debounce(1_500).collect { publicar() }
         }
-        scope.launch(Dispatchers.IO) { sincronizarAhora() }
+        // En el teléfono no se publica hasta haber entrado a la cuenta: si no, un arranque
+        // sin mazos borraría lo que el reloj ya tiene.
+        if (publicarAlArrancar) scope.launch(Dispatchers.IO) { sincronizarAhora() }
     }
 
     /** Publica lo local y lee lo último que haya dejado el otro dispositivo. */

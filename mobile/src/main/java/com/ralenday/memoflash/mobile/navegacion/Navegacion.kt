@@ -15,15 +15,21 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.ralenday.memoflash.mobile.nube.EstadoSesion
+import com.ralenday.memoflash.mobile.nube.LocalCuenta
+import com.ralenday.memoflash.mobile.pantallas.PantallaAcceso
 import com.ralenday.memoflash.mobile.pantallas.PantallaDetalleMazo
 import com.ralenday.memoflash.mobile.pantallas.PantallaEditor
 import com.ralenday.memoflash.mobile.pantallas.PantallaEstadisticas
@@ -48,6 +54,18 @@ private const val DURACION = 320
 
 @Composable
 fun AppMemoFlash() {
+    val sesion by LocalCuenta.current.sesion.collectAsState()
+    when (sesion) {
+        EstadoSesion.Cargando -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
+        EstadoSesion.SinSesion -> PantallaAcceso()
+        is EstadoSesion.Activa -> NavegacionPrincipal()
+    }
+}
+
+@Composable
+fun NavegacionPrincipal() {
     val pila = remember { mutableStateListOf<Pantalla>(Pantalla.Mazos) }
     var movimiento by remember { mutableStateOf(Movimiento.ADELANTE) }
     // Guarda el estado (scroll, textos) de cada pantalla mientras siga en la pila

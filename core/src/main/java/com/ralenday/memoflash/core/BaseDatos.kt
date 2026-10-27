@@ -75,9 +75,12 @@ class BaseDatos private constructor(context: Context) :
         db.execSQL("CREATE INDEX idx_tarjetas_mazo ON tarjetas(mazo_uuid, proximo_repaso)")
         db.execSQL("CREATE INDEX idx_historial_tarjeta ON historial_repasos(tarjeta_uuid)")
         db.execSQL("CREATE INDEX idx_historial_fecha ON historial_repasos(fecha)")
+        crearBorrados(db)
     }
 
-    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
+    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        if (oldVersion < 2) crearBorrados(db)
+    }
 
     // ---------------------------------------------------------------- Mazos
 
@@ -108,7 +111,12 @@ class BaseDatos private constructor(context: Context) :
     }
 
     fun eliminarMazo(uuid: String) {
-        writableDatabase.delete("mazos", "uuid = ?", arrayOf(uuid))
+        transaccion {
+            val tarjetas = rawQuery("SELECT uuid FROM tarjetas WHERE mazo_uuid = ?", arrayOf(uuid)).lista { getString(0) }
+            delete("mazos", "uuid = ?", arrayOf(uuid))
+            anotarBorrado("mazos", uuid)
+            tarjetas.forEach { anotarBorrado("tarjetas", it) }
+        }
         notificar(local = true)
     }
 
@@ -122,6 +130,9 @@ class BaseDatos private constructor(context: Context) :
 
     fun todasLasTarjetas(): List<Tarjeta> =
         readableDatabase.rawQuery("SELECT * FROM tarjetas", null).lista { leerTarjeta() }
+
+    fun todosLosMazos(): List<Mazo> =
+        readableDatabase.rawQuery("SELECT * FROM mazos", null).lista { leerMazo() }
 
     fun tarjeta(uuid: String): Tarjeta? =
         readableDatabase.rawQuery("SELECT * FROM tarjetas WHERE uuid = ?", arrayOf(uuid))
@@ -162,7 +173,10 @@ class BaseDatos private constructor(context: Context) :
     }
 
     fun eliminarTarjeta(uuid: String) {
-        writableDatabase.delete("tarjetas", "uuid = ?", arrayOf(uuid))
+        transaccion {
+            delete("tarjetas", "uuid = ?", arrayOf(uuid))
+            anotarBorrado("tarjetas", uuid)
+        }
         notificar(local = true)
     }
 
@@ -189,6 +203,65 @@ class BaseDatos private constructor(context: Context) :
         }
         notificar(local = true)
         return tarjeta.copy(estado = nuevoEstado)
+    }
+
+    fun instantanea(): Instantanea = Instantanea(todosLosMazos(), todasLasTarjetas(), historial(), borrados())
+
+    fun borrados(): List<Borrado> =
+        readableDatabase.rawQuery("SELECT tabla, uuid, fecha FROM borrados", null).lista {
+            Borrado(getString(0), getString(1), getLong(2))
+        }
+
+    /**
+     * Deja la base como [resultado], sin anotar borrados nuevos: los que vienen en el resultado
+     * ya son la lista completa. No avisa como cambio local para no disparar otra subida.
+     */
+    fun aplicarFusion(resultado: Instantanea) {
+        transaccion {
+            val mazosOk = resultado.mazos.map { it.uuid }.toSet()
+            val tarjetasOk = resultado.tarjetas.map { it.uuid }.toSet()
+            ids("mazos").filterNot { it in mazosOk }.forEach { delete("mazos", "uuid = ?", arrayOf(it)) }
+            ids("tarjetas").filterNot { it in tarjetasOk }.forEach { delete("tarjetas", "uuid = ?", arrayOf(it)) }
+            for (mazo in resultado.mazos) {
+                if (update("mazos", mazo.valores(), "uuid = ?", arrayOf(mazo.uuid)) == 0) {
+                    insert("mazos", null, mazo.valores())
+                }
+            }
+            for (tarjeta in resultado.tarjetas) {
+                if (update("tarjetas", tarjeta.valores(), "uuid = ?", arrayOf(tarjeta.uuid)) == 0) {
+                    insert("tarjetas", null, tarjeta.valores())
+                }
+            }
+            val ya = rawQuery("SELECT uuid FROM historial_repasos", null).lista { getString(0) }.toSet()
+            for (repaso in resultado.repasos) {
+                if (repaso.uuid in ya || !existe("tarjetas", repaso.tarjetaUuid)) continue
+                insertWithOnConflict(
+                    "historial_repasos", null, repaso.valores(sincronizado = true),
+                    SQLiteDatabase.CONFLICT_IGNORE,
+                )
+            }
+            delete("borrados", null, null)
+            for (borrado in resultado.borrados) {
+                insert("borrados", null, ContentValues().apply {
+                    put("tabla", borrado.tabla)
+                    put("uuid", borrado.uuid)
+                    put("fecha", borrado.fecha)
+                })
+            }
+            ids("tarjetas").forEach { recalcular(it) }
+        }
+        notificar(local = false)
+    }
+
+    /** Vacía la base sin anotarlo como borrado: se usa al cerrar sesión, no para borrar en la nube. */
+    fun vaciar() {
+        transaccion {
+            delete("mazos", null, null)
+            delete("tarjetas", null, null)
+            delete("historial_repasos", null, null)
+            delete("borrados", null, null)
+        }
+        notificar(local = false)
     }
 
     fun historial(desde: Long = 0): List<Repaso> =
@@ -296,6 +369,19 @@ class BaseDatos private constructor(context: Context) :
     private fun SQLiteDatabase.ids(tabla: String): List<String> =
         rawQuery("SELECT uuid FROM $tabla", null).lista { getString(0) }
 
+    private fun SQLiteDatabase.anotarBorrado(tabla: String, uuid: String) {
+        insertWithOnConflict(
+            "borrados",
+            null,
+            ContentValues().apply {
+                put("tabla", tabla)
+                put("uuid", uuid)
+                put("fecha", System.currentTimeMillis())
+            },
+            SQLiteDatabase.CONFLICT_REPLACE,
+        )
+    }
+
     private fun tocarMazo(uuid: String) {
         writableDatabase.update(
             "mazos", ContentValues().apply { put("actualizado", System.currentTimeMillis()) },
@@ -320,7 +406,7 @@ class BaseDatos private constructor(context: Context) :
     }
 
     companion object {
-        private const val VERSION = 1
+        private const val VERSION = 2
 
         @Volatile
         private var instancia: BaseDatos? = null
@@ -331,6 +417,19 @@ class BaseDatos private constructor(context: Context) :
 }
 
 // ---------------------------------------------------------------- Conversión filas <-> objetos
+
+private fun crearBorrados(db: SQLiteDatabase) {
+    db.execSQL(
+        """
+        CREATE TABLE IF NOT EXISTS borrados (
+            tabla TEXT NOT NULL,
+            uuid  TEXT NOT NULL,
+            fecha INTEGER NOT NULL,
+            PRIMARY KEY (tabla, uuid)
+        )
+        """
+    )
+}
 
 private fun <T> Cursor.lista(leer: Cursor.() -> T): List<T> = use {
     buildList { while (moveToNext()) add(leer()) }

@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -34,6 +35,7 @@ import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -67,6 +69,8 @@ import com.ralenday.memoflash.mobile.datos.LocalBaseDatos
 import com.ralenday.memoflash.mobile.datos.formatearFecha
 import com.ralenday.memoflash.mobile.datos.plural
 import com.ralenday.memoflash.mobile.datos.rememberConsulta
+import com.ralenday.memoflash.mobile.nube.EstadoSesion
+import com.ralenday.memoflash.mobile.nube.LocalCuenta
 import com.ralenday.memoflash.mobile.tema.Iconos
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -75,9 +79,13 @@ import kotlinx.coroutines.launch
 @Composable
 fun PantallaMazos(abrirMazo: (String) -> Unit, irAEstadisticas: () -> Unit) {
     val db = LocalBaseDatos.current
+    val cuenta = LocalCuenta.current
+    val sesion by cuenta.sesion.collectAsState()
+    val nube by cuenta.nube.collectAsState()
     val scope = rememberCoroutineScope()
     val mazos = rememberConsulta { mazos() }
     var creando by rememberSaveable { mutableStateOf(false) }
+    var cerrarSesion by rememberSaveable { mutableStateOf(false) }
     val lista = rememberLazyListState()
     val barra = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     // El botón flotante se encoge a solo ícono al bajar por la lista
@@ -115,6 +123,19 @@ fun PantallaMazos(abrirMazo: (String) -> Unit, irAEstadisticas: () -> Unit) {
         ) {
             item(key = "resumen") { ResumenDelDia(mazos, Modifier.animateItem()) }
             item(key = "sync") { TarjetaSincronizacion(Modifier.animateItem()) }
+            if (sesion is EstadoSesion.Activa) {
+                item(key = "cuenta") {
+                    TarjetaCuenta(
+                        correo = (sesion as EstadoSesion.Activa).correo,
+                        sincronizando = nube.sincronizando,
+                        ultima = nube.ultima,
+                        error = nube.error,
+                        sincronizar = cuenta::sincronizarEnSegundoPlano,
+                        salir = { cerrarSesion = true },
+                        modifier = Modifier.animateItem(),
+                    )
+                }
+            }
             item(key = "titulo") {
                 Text(
                     "Mazos",
@@ -150,6 +171,20 @@ fun PantallaMazos(abrirMazo: (String) -> Unit, irAEstadisticas: () -> Unit) {
                 creando = false
                 scope.launch(Dispatchers.IO) { db.guardarMazo(Mazo(nombre = nombre, descripcion = descripcion)) }
             },
+        )
+    }
+    if (cerrarSesion) {
+        AlertDialog(
+            onDismissRequest = { cerrarSesion = false },
+            title = { Text("Cerrar sesión") },
+            text = { Text("Tus mazos siguen guardados en tu cuenta. En este teléfono se quitan hasta que vuelvas a entrar.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    cerrarSesion = false
+                    scope.launch { cuenta.salir() }
+                }) { Text("Cerrar sesión") }
+            },
+            dismissButton = { TextButton(onClick = { cerrarSesion = false }) { Text("Cancelar") } },
         )
     }
 }
@@ -236,6 +271,50 @@ private fun FilaMazo(resumen: ResumenMazo, modifier: Modifier = Modifier, onClic
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     icono = Iconos.Listo,
                 )
+            }
+        }
+    }
+}
+
+/** Muestra la cuenta y si la última copia llegó a Supabase. */
+@Composable
+private fun TarjetaCuenta(
+    correo: String,
+    sincronizando: Boolean,
+    ultima: Long,
+    error: String?,
+    sincronizar: () -> Unit,
+    salir: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Bloque(modifier.fillMaxWidth()) {
+        Row(
+            Modifier.padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    correo.ifBlank { "Cuenta" },
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    when {
+                        sincronizando -> "Guardando en tu cuenta…"
+                        error != null -> "Sin conexión. Se reintentará solo"
+                        ultima > 0 -> "Guardado: ${formatearFecha(ultima)}"
+                        else -> "Se guarda en tu cuenta"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            IconButton(onClick = sincronizar, enabled = !sincronizando) {
+                if (sincronizando) IconoGirando() else Icon(Iconos.Sincronizar, contentDescription = "Guardar en la cuenta")
+            }
+            IconButton(onClick = salir) {
+                Icon(Iconos.Salir, contentDescription = "Cerrar sesión")
             }
         }
     }

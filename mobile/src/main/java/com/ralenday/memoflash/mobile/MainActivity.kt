@@ -8,6 +8,9 @@ import androidx.compose.runtime.CompositionLocalProvider
 import com.ralenday.memoflash.core.BaseDatos
 import com.ralenday.memoflash.mobile.datos.LocalBaseDatos
 import com.ralenday.memoflash.mobile.navegacion.AppMemoFlash
+import com.ralenday.memoflash.mobile.navegacion.NavegacionPrincipal
+import com.ralenday.memoflash.mobile.nube.Cuenta
+import com.ralenday.memoflash.mobile.nube.LocalCuenta
 import com.ralenday.memoflash.mobile.tema.TemaMemoFlash
 
 class MainActivity : ComponentActivity() {
@@ -15,9 +18,13 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         val db = BaseDatos.get(this)
+        val cuenta = Cuenta.get(this)
+        val omitirCuenta = BuildConfig.DEBUG && AccesoDepuracion.omitirCuenta
         setContent {
             TemaMemoFlash {
-                CompositionLocalProvider(LocalBaseDatos provides db) { AppMemoFlash() }
+                CompositionLocalProvider(LocalBaseDatos provides db, LocalCuenta provides cuenta) {
+                    if (omitirCuenta) NavegacionPrincipal() else AppMemoFlash()
+                }
             }
         }
     }

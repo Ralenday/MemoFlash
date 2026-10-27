@@ -25,6 +25,10 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class FlujoPrincipalTest {
 
+    init {
+        AccesoDepuracion.omitirCuenta = true
+    }
+
     @get:Rule
     val regla = createAndroidComposeRule<MainActivity>()
 
