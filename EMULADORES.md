@@ -1,4 +1,4 @@
-# Guía para correr MemoFlash con 2 emuladores en otro PC 📱⌚
+# Guía para correr MemoFlash con 2 emuladores en otro PC
 
 Esta guía explica paso a paso cómo preparar, ejecutar y sincronizar **MemoFlash** en otro ordenador usando **dos emuladores al mismo tiempo** (uno de teléfono Android y otro de reloj Wear OS), tanto desde **Android Studio** como desde la **terminal**, **sin necesidad de iniciar sesión con una cuenta de Google**.
 
@@ -84,6 +84,15 @@ adb -s emulator-5554 forward tcp:19877 tcp:19877
 
 > **Importante:** Si reinicias los emuladores en otra sesión, vuelve a ejecutar esos dos comandos `adb forward`.
 
+> **Emuladores con Android 17 (API 37):** el sistema exige el permiso de *red local* para que una
+> app se conecte a `10.0.2.2`. Después de instalar MemoFlash en ambos emuladores, concédelo así
+> (si no, cada emulador se queda en "no conectado"):
+>
+> ```bash
+> adb -s emulator-5556 shell pm grant com.ralenday.memoflash android.permission.ACCESS_LOCAL_NETWORK
+> adb -s emulator-5554 shell pm grant com.ralenday.memoflash android.permission.ACCESS_LOCAL_NETWORK
+> ```
+
 ---
 
 ## 4. Instalar y correr MemoFlash en ambos emuladores
@@ -131,7 +140,7 @@ adb -s emulator-5554 shell am start -n com.ralenday.memoflash/com.ralenday.memof
 ## 5. Verificar que la sincronización funciona
 
 1. Al abrir ambas apps (con los puertos `19876` y `19877` redirigidos):
-   - En el **teléfono** verás: **`⌚ Reloj conectado: Reloj (emulador)`** y la hora de última sincronización.
-   - En el **reloj** verás: **`📱 Teléfono conectado`** y el mazo de ejemplo **“Inglés básico”** listo para estudiar.
-2. Si abriste primero un emulador y luego el otro, toca el botón **Sincronizar** en cualquiera de los dos.
+   - En el **teléfono** verás: **`Reloj conectado: Reloj (emulador)`** y la hora de la última sincronización.
+   - En el **reloj** verás: **`Teléfono conectado`** y el mazo de ejemplo **“Inglés básico”** listo para estudiar.
+2. Si abriste primero un emulador y luego el otro, toca el ícono de **sincronizar** (las dos flechas en círculo) en el teléfono o el botón **Sincronizar** en el reloj.
 3. Entra a **Inglés básico** en el reloj, responde una tarjeta (**Difícil / Regular / Fácil**) y observa cómo a los ~1.5 segundos el contador de tarjetas pendientes en el teléfono se actualiza solo y el repaso suma en la pestaña **Estadísticas → Dónde estudias**.

@@ -87,7 +87,6 @@ fun PantallaRepaso(mazoId: String, terminar: () -> Unit) {
             when {
                 cargando -> item { Text("Cargando…") }
                 actual == null -> {
-                    item { Text("🎉", fontSize = 32.sp) }
                     item { ListHeader { Text("¡Listo!") } }
                     item {
                         Text(
@@ -172,7 +171,7 @@ private fun LadoTarjeta(
         }
         if (tieneImagen) {
             Text(
-                if (texto.isBlank()) "📷 Imagen: ábrela en el teléfono" else "📷 + imagen en el teléfono",
+                if (texto.isBlank()) "Imagen: ábrela en el teléfono" else "Con imagen: mírala en el teléfono",
                 style = MaterialTheme.typography.labelSmall,
                 textAlign = TextAlign.Center,
             )

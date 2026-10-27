@@ -1,4 +1,4 @@
-package com.ralenday.memoflash.mobile
+package com.ralenday.memoflash.mobile.datos
 
 /**
  * Convierte una lista de texto en pares (frente, reverso). Una tarjeta por línea, separada por

@@ -87,7 +87,7 @@ fun PantallaMazos(abrir: (String) -> Unit) {
             if (actuales != null && actuales.isEmpty()) {
                 item {
                     Text(
-                        "Crea mazos en el teléfono y aparecerán aquí ⌚",
+                        "Crea mazos en el teléfono y aparecerán aquí",
                         textAlign = TextAlign.Center,
                         style = MaterialTheme.typography.bodySmall,
                     )
@@ -106,7 +106,7 @@ fun PantallaMazos(abrir: (String) -> Unit) {
                             secondaryContentColor = Azul,
                         ),
                         label = { Text(resumen.mazo.nombre, maxLines = 2) },
-                        secondaryLabel = { Text(if (hay) "${resumen.pendientes} por repasar" else "Al día ✓") },
+                        secondaryLabel = { Text(if (hay) "${resumen.pendientes} por repasar" else "Al día") },
                     )
                 }
             }
@@ -114,8 +114,8 @@ fun PantallaMazos(abrir: (String) -> Unit) {
                 Text(
                     when {
                         sync.sincronizando -> "Sincronizando…"
-                        sync.conectado -> "📱 Teléfono conectado"
-                        else -> "📴 Sin teléfono: se guarda aquí"
+                        sync.conectado -> "Teléfono conectado"
+                        else -> "Sin teléfono: se guarda aquí"
                     },
                     style = MaterialTheme.typography.labelSmall,
                     textAlign = TextAlign.Center,
